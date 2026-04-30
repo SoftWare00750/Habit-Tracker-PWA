@@ -1,16 +1,13 @@
-import { Habit } from '../types/habit';
+export type Frequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
-export function toggleHabitCompletion(habit: Habit, date: string): Habit {
-  const completions = [...habit.completions];
-  const index = completions.indexOf(date);
-
-  if (index === -1) {
-    completions.push(date);
-  } else {
-    completions.splice(index, 1);
-  }
-
-  const unique = Array.from(new Set(completions));
-
-  return { ...habit, completions: unique };
-}
+export type Habit = {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  frequency: Frequency;
+  createdAt: string;
+  completions: string[];
+  color?: string;
+  emoji?: string;
+};

@@ -3,24 +3,22 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSession, clearSession, getHabits, saveHabits } from '@/lib/storage';
-import { Habit } from '@/types/habit';
+import { Habit, Frequency } from '@/types/habit';
 import HabitCard from '@/components/habits/HabitCard';
 import HabitForm from '@/components/habits/HabitForm';
+import { isCompletedForPeriod } from '@/lib/streaks';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [session, setSession] = useState<{ userId: string; email: string } | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [habits, setHabits]             = useState<Habit[]>([]);
+  const [session, setSession]           = useState<{ userId: string; email: string } | null>(null);
+  const [showForm, setShowForm]         = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     const s = getSession();
-    if (!s) {
-      router.replace('/login');
-      return;
-    }
+    if (!s) { router.replace('/login'); return; }
     setSession(s);
     const allHabits = getHabits();
     setHabits(allHabits.filter((h) => h.userId === s.userId));
@@ -33,41 +31,38 @@ export default function DashboardPage() {
     setHabits(updated);
   };
 
-  const handleCreate = (name: string, description: string) => {
+  const handleCreate = (name: string, description: string, frequency: Frequency, emoji: string, color: string) => {
     if (!session) return;
     const newHabit: Habit = {
       id: crypto.randomUUID(),
       userId: session.userId,
       name,
       description,
-      frequency: 'daily',
+      frequency,
+      emoji,
+      color,
       createdAt: new Date().toISOString(),
       completions: [],
     };
-    const updated = [...habits, newHabit];
-    persistHabits(updated);
+    persistHabits([...habits, newHabit]);
     setShowForm(false);
   };
 
-  const handleEdit = (name: string, description: string) => {
+  const handleEdit = (name: string, description: string, frequency: Frequency, emoji: string, color: string) => {
     if (!editingHabit) return;
     const updated = habits.map((h) =>
-      h.id === editingHabit.id
-        ? { ...h, name, description }
-        : h
+      h.id === editingHabit.id ? { ...h, name, description, frequency, emoji, color } : h
     );
     persistHabits(updated);
     setEditingHabit(null);
   };
 
   const handleDelete = (id: string) => {
-    const updated = habits.filter((h) => h.id !== id);
-    persistHabits(updated);
+    persistHabits(habits.filter((h) => h.id !== id));
   };
 
   const handleUpdate = (updated: Habit) => {
-    const newHabits = habits.map((h) => (h.id === updated.id ? updated : h));
-    persistHabits(newHabits);
+    persistHabits(habits.map((h) => (h.id === updated.id ? updated : h)));
   };
 
   const handleLogout = () => {
@@ -75,7 +70,9 @@ export default function DashboardPage() {
     router.replace('/login');
   };
 
-  const completedToday = habits.filter((h) => h.completions.includes(today)).length;
+  const completedToday = habits.filter((h) =>
+    isCompletedForPeriod(h.completions, today, h.frequency ?? 'daily')
+  ).length;
 
   return (
     <div data-testid="dashboard-page" className="min-h-screen bg-gray-50">
@@ -111,12 +108,10 @@ export default function DashboardPage() {
             <span className="text-3xl font-bold">{completedToday}</span>
             <span className="text-emerald-200 text-sm mb-1">/ {habits.length} habits</span>
           </div>
-          <p className="text-xs text-emerald-100 mt-1">
-            {today}
-          </p>
+          <p className="text-xs text-emerald-100 mt-1">{today}</p>
         </div>
 
-        {/* Add habit button or form */}
+        {/* Add habit button */}
         {!showForm && !editingHabit && (
           <button
             data-testid="create-habit-button"
@@ -132,10 +127,7 @@ export default function DashboardPage() {
 
         {showForm && (
           <div className="mb-4">
-            <HabitForm
-              onSave={handleCreate}
-              onCancel={() => setShowForm(false)}
-            />
+            <HabitForm onSave={handleCreate} onCancel={() => setShowForm(false)} />
           </div>
         )}
 
@@ -151,10 +143,7 @@ export default function DashboardPage() {
 
         {/* Habits list */}
         {habits.length === 0 && !showForm ? (
-          <div
-            data-testid="empty-state"
-            className="text-center py-16"
-          >
+          <div data-testid="empty-state" className="text-center py-16">
             <div className="text-5xl mb-4">🌱</div>
             <h3 className="text-base font-semibold text-gray-700 mb-1">No habits yet</h3>
             <p className="text-sm text-gray-400">Add your first habit to get started</p>
@@ -167,10 +156,7 @@ export default function DashboardPage() {
                 habit={habit}
                 today={today}
                 onUpdate={handleUpdate}
-                onEdit={(h) => {
-                  setEditingHabit(h);
-                  setShowForm(false);
-                }}
+                onEdit={(h) => { setEditingHabit(h); setShowForm(false); }}
                 onDelete={handleDelete}
               />
             ))}
